@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { formatDistanceToNow } from 'date-fns';
 import { Tweet } from '@/types';
+import { Heart, MessageCircle, Share2 } from 'lucide-react';
 
 async function getTweets(): Promise<Tweet[]> {
   const tweets = await prisma.tweet.findMany({
@@ -27,14 +28,17 @@ export default async function TweetList() {
   return (
     <div className="space-y-4">
       {tweets.map((tweet: Tweet) => (
-        <div key={tweet.id} className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center mb-2">
-            <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+        <div
+          key={tweet.id}
+          className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 ease-in-out"
+        >
+          <div className="flex items-center mb-4">
+            <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
               {tweet.author.image ? (
                 <img
                   src={tweet.author.image}
                   alt={tweet.author.name || 'User'}
-                  className="h-10 w-10 rounded-full"
+                  className="h-12 w-12 object-cover"
                 />
               ) : (
                 <span className="text-xl text-gray-500">
@@ -42,8 +46,8 @@ export default async function TweetList() {
                 </span>
               )}
             </div>
-            <div className="ml-3">
-              <p className="font-semibold">{tweet.author.name}</p>
+            <div className="ml-4">
+              <p className="font-semibold text-gray-900">{tweet.author.name}</p>
               <p className="text-sm text-gray-500">
                 {formatDistanceToNow(new Date(tweet.createdAt), {
                   addSuffix: true,
@@ -51,30 +55,27 @@ export default async function TweetList() {
               </p>
             </div>
           </div>
-          <p className="text-gray-800 mb-3">{tweet.content}</p>
-          <div className="flex items-center text-gray-500">
-            <button className="flex items-center space-x-1 hover:text-blue-500">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
+          <p className="text-gray-800 mb-4 text-lg">{tweet.content}</p>
+          <div className="flex items-center space-x-6 text-gray-500">
+            <button className="flex items-center space-x-2 hover:text-blue-500 transition-colors group">
+              <MessageCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
+              <span>0</span>
+            </button>
+            <button className="flex items-center space-x-2 hover:text-pink-500 transition-colors group">
+              <Heart className={`h-5 w-5 group-hover:scale-110 transition-transform ${tweet.likes.length > 0 ? 'fill-pink-500 text-pink-500' : ''}`} />
               <span>{tweet.likes.length}</span>
+            </button>
+            <button className="flex items-center space-x-2 hover:text-green-500 transition-colors group">
+              <Share2 className="h-5 w-5 group-hover:scale-110 transition-transform" />
             </button>
           </div>
         </div>
       ))}
       {tweets.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No tweets yet. Be the first to tweet!
+        <div className="text-center py-12 bg-white rounded-xl shadow-sm">
+          <p className="text-gray-500 text-lg">
+            No tweets yet. Be the first to tweet!
+          </p>
         </div>
       )}
     </div>
