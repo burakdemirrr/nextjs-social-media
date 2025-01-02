@@ -9,23 +9,24 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -46,11 +47,11 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  password      String?
   accounts      Account[]
   sessions      Session[]
   tweets        Tweet[]
   likes         Like[]
+  comments      Comment[]
 }
 
 model VerificationToken {
@@ -62,22 +63,34 @@ model VerificationToken {
 }
 
 model Tweet {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  image     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  author    User      @relation(fields: [authorId], references: [id])
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes     Like[]
+  comments  Comment[]
 }
 
 model Like {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
-  userId    String
+  tweet     Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
   tweetId   String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tweet     Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  userId    String
 
-  @@unique([userId, tweetId])
+  @@unique([tweetId, userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  tweet     Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  tweetId   String
+  author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
 }

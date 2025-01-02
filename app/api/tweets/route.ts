@@ -3,51 +3,6 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 
-export async function POST(req: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "You must be logged in to create a tweet" },
-        { status: 401 }
-      );
-    }
-
-    const { content } = await req.json();
-
-    if (!content) {
-      return NextResponse.json(
-        { error: "Content is required" },
-        { status: 400 }
-      );
-    }
-
-    const tweet = await prisma.tweet.create({
-      data: {
-        content,
-        authorId: session.user.id,
-      },
-      include: {
-        author: {
-          select: {
-            name: true,
-            image: true,
-          },
-        },
-      },
-    });
-
-    return NextResponse.json(tweet, { status: 201 });
-  } catch (error) {
-    console.error("Error in tweet creation:", error);
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    );
-  }
-}
-
 export async function GET() {
   try {
     const tweets = await prisma.tweet.findMany({
@@ -59,6 +14,16 @@ export async function GET() {
           },
         },
         likes: true,
+        comments: {
+          include: {
+            author: {
+              select: {
+                name: true,
+                image: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -67,10 +32,45 @@ export async function GET() {
 
     return NextResponse.json(tweets);
   } catch (error) {
-    console.error("Error fetching tweets:", error);
-    return NextResponse.json(
-      { error: "Something went wrong" },
-      { status: 500 }
-    );
+    console.error('Error in GET /api/tweets:', error);
+    return new NextResponse('Internal error', { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const { content, image } = await request.json();
+
+    if (!content?.trim()) {
+      return new NextResponse('Tweet content is required', { status: 400 });
+    }
+
+    const tweet = await prisma.tweet.create({
+      data: {
+        content,
+        image,
+        author: { connect: { id: session.user.id } },
+      },
+      include: {
+        author: {
+          select: {
+            name: true,
+            image: true,
+          },
+        },
+        likes: true,
+        comments: true,
+      },
+    });
+
+    return NextResponse.json(tweet);
+  } catch (error) {
+    console.error('Error in POST /api/tweets:', error);
+    return new NextResponse('Internal error', { status: 500 });
   }
 } 

@@ -1,21 +1,42 @@
+export interface User {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+}
+
+export interface Like {
+  id: string;
+  userId: string;
+  tweetId: string;
+  createdAt: Date;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  userId: string;
+  tweetId: string;
+  createdAt: Date;
+  author: {
+    name: string | null;
+    image: string | null;
+  };
+}
+
 export interface Tweet {
   id: string;
   content: string;
+  image?: string | null;
+  authorId: string;
   createdAt: Date;
   updatedAt: Date;
-  authorId: string;
   author: {
     name: string | null;
     image: string | null;
   };
   likes: Like[];
-}
-
-export interface Like {
-  id: string;
-  createdAt: Date;
-  userId: string;
-  tweetId: string;
+  comments: Comment[];
 }
 
 declare module "next-auth" {
