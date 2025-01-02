@@ -22,8 +22,8 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="fixed left-0 top-0 h-screen w-64 bg-gray-900 border-r border-gray-800 p-4">
-      <div className="pt-16 space-y-6">
+    <div className="fixed left-0 top-0 h-screen w-100 bg-gray-900 border-r border-gray-800 p-4 pt-8">
+      <div className=" space-y-6">
         {/* User Profile Section */}
         <div className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800">
           <div className="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">

@@ -1,23 +1,17 @@
 'use client';
 
-import { formatDistanceToNow } from 'date-fns';
-import { Tweet } from '@/types';
-import { Heart, MessageCircle, Share2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { Tweet } from '@/types';
+import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-hot-toast';
+import Link from 'next/link';
 
 export default function TweetList() {
   const { data: session } = useSession();
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLiking, setIsLiking] = useState<Record<string, boolean>>({});
-  const [showComments, setShowComments] = useState<Record<string, boolean>>({});
-  const [commentText, setCommentText] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    fetchTweets();
-  }, []);
 
   const fetchTweets = async () => {
     try {
@@ -26,19 +20,22 @@ export default function TweetList() {
       const data = await res.json();
       setTweets(data);
     } catch (error) {
+      console.error('Error fetching tweets:', error);
       toast.error('Failed to load tweets');
     } finally {
       setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchTweets();
+  }, []);
+
   const handleLike = async (tweetId: string) => {
-    if (!session) {
+    if (!session?.user) {
       toast.error('Please sign in to like tweets');
       return;
     }
-
-    setIsLiking(prev => ({ ...prev, [tweetId]: true }));
 
     try {
       const res = await fetch(`/api/tweets/${tweetId}/like`, {
@@ -47,40 +44,20 @@ export default function TweetList() {
 
       if (!res.ok) throw new Error('Failed to like tweet');
       
-      const currentTweet = tweets.find(t => t.id === tweetId);
-      const hasLiked = currentTweet?.likes.some(like => like.userId === session.user.id);
-
-      // Update local state
-      setTweets(prev => 
-        prev.map(tweet => {
-          if (tweet.id === tweetId) {
-            return {
-              ...tweet,
-              likes: hasLiked 
-                ? tweet.likes.filter(like => like.userId !== session.user.id)
-                : [...tweet.likes, { id: Date.now().toString(), userId: session.user.id, tweetId, createdAt: new Date() }],
-            };
-          }
-          return tweet;
-        })
-      );
-
-      toast.success(hasLiked ? 'Tweet unliked' : 'Tweet liked');
+      // Refresh tweets to show updated likes
+      fetchTweets();
+      toast.success('Tweet liked!');
     } catch (error) {
+      console.error('Error liking tweet:', error);
       toast.error('Failed to like tweet');
-    } finally {
-      setIsLiking(prev => ({ ...prev, [tweetId]: false }));
     }
   };
 
-  const handleComment = async (tweetId: string) => {
-    if (!session) {
+  const handleComment = async (tweetId: string, content: string) => {
+    if (!session?.user) {
       toast.error('Please sign in to comment');
       return;
     }
-
-    const comment = commentText[tweetId]?.trim();
-    if (!comment) return;
 
     try {
       const res = await fetch(`/api/tweets/${tweetId}/comment`, {
@@ -88,168 +65,128 @@ export default function TweetList() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content: comment }),
+        body: JSON.stringify({ content }),
       });
 
-      if (!res.ok) throw new Error('Failed to post comment');
-
-      const newComment = await res.json();
-
-      // Update local state
-      setTweets(prev =>
-        prev.map(tweet => {
-          if (tweet.id === tweetId) {
-            return {
-              ...tweet,
-              comments: [...tweet.comments, newComment],
-            };
-          }
-          return tweet;
-        })
-      );
-
-      setCommentText(prev => ({ ...prev, [tweetId]: '' }));
-      toast.success('Comment posted');
+      if (!res.ok) throw new Error('Failed to add comment');
+      
+      // Refresh tweets to show new comment
+      fetchTweets();
+      toast.success('Comment added!');
     } catch (error) {
-      toast.error('Failed to post comment');
+      console.error('Error adding comment:', error);
+      toast.error('Failed to add comment');
     }
   };
 
   if (isLoading) {
     return (
-      <div className="text-center py-12 bg-gray-800 rounded-xl shadow-lg">
-        <p className="text-gray-400 text-lg">Loading tweets...</p>
+      <div className="flex justify-center items-center h-32">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {tweets.map((tweet: Tweet) => (
-        <div
-          key={tweet.id}
-          className="bg-gray-800 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 ease-in-out"
-        >
-          <div className="flex items-center mb-4">
-            <div className="h-12 w-12 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">
+      {tweets.map((tweet) => (
+        <div key={tweet.id} className="bg-gray-800 p-4 rounded-lg">
+          <div className="flex items-start space-x-3">
+            <Link href={`/profile/${tweet.author.id}`}>
               {tweet.author.image ? (
-                <img
+                <Image
                   src={tweet.author.image}
                   alt={tweet.author.name || 'User'}
-                  className="h-12 w-12 object-cover"
+                  width={40}
+                  height={40}
+                  className="rounded-full"
                 />
               ) : (
-                <span className="text-xl text-gray-400">
-                  {tweet.author.name?.[0] || '?'}
+                <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+                  <span className="text-xl text-white">
+                    {tweet.author.name?.[0]?.toUpperCase() || '?'}
+                  </span>
+                </div>
+              )}
+            </Link>
+            <div className="flex-1">
+              <div className="flex items-center space-x-2">
+                <Link href={`/profile/${tweet.author.id}`} className="font-semibold text-white hover:underline">
+                  {tweet.author.name}
+                </Link>
+                <span className="text-gray-400 text-sm">
+                  {formatDistanceToNow(new Date(tweet.createdAt), { addSuffix: true })}
                 </span>
+              </div>
+              <p className="text-white mt-1">{tweet.content}</p>
+              {tweet.image && (
+                <div className="mt-2">
+                  <Image
+                    src={tweet.image}
+                    alt="Tweet image"
+                    width={400}
+                    height={300}
+                    className="rounded-lg"
+                  />
+                </div>
+              )}
+              <div className="flex items-center space-x-4 mt-3">
+                <button
+                  onClick={() => handleLike(tweet.id)}
+                  className="flex items-center space-x-1 text-gray-400 hover:text-pink-500 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  <span>{tweet.likes?.length || 0}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const content = prompt('Enter your comment:');
+                    if (content) handleComment(tweet.id, content);
+                  }}
+                  className="flex items-center space-x-1 text-gray-400 hover:text-blue-500 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <span>{tweet.comments?.length || 0}</span>
+                </button>
+              </div>
+              {tweet.comments && tweet.comments.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {tweet.comments.map((comment) => (
+                    <div key={comment.id} className="bg-gray-700 p-3 rounded">
+                      <div className="flex items-center space-x-2">
+                        {comment.author.image ? (
+                          <Image
+                            src={comment.author.image}
+                            alt={comment.author.name || 'User'}
+                            width={24}
+                            height={24}
+                            className="rounded-full"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center">
+                            <span className="text-sm text-white">
+                              {comment.author.name?.[0]?.toUpperCase() || '?'}
+                            </span>
+                          </div>
+                        )}
+                        <span className="font-medium text-white">{comment.author.name}</span>
+                      </div>
+                      <p className="text-gray-300 mt-1">{comment.content}</p>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-            <div className="ml-4">
-              <p className="font-semibold text-white">{tweet.author.name}</p>
-              <p className="text-sm text-gray-400">
-                {formatDistanceToNow(new Date(tweet.createdAt), {
-                  addSuffix: true,
-                })}
-              </p>
-            </div>
           </div>
-          <p className="text-gray-100 mb-4 text-lg">{tweet.content}</p>
-          {tweet.image && (
-            <div className="mb-4 rounded-xl overflow-hidden">
-              <img 
-                src={tweet.image} 
-                alt="Tweet image" 
-                className="max-h-96 object-contain w-full bg-gray-700"
-              />
-            </div>
-          )}
-          <div className="flex items-center space-x-6 text-gray-400">
-            <button 
-              className="flex items-center space-x-2 hover:text-blue-400 transition-colors group"
-              onClick={() => setShowComments(prev => ({ ...prev, [tweet.id]: !prev[tweet.id] }))}
-            >
-              <MessageCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
-              <span>{tweet.comments.length}</span>
-            </button>
-            <button 
-              className={`flex items-center space-x-2 ${
-                tweet.likes.some(like => like.userId === session?.user?.id)
-                  ? 'text-pink-500'
-                  : 'hover:text-pink-500'
-              } transition-colors group`}
-              onClick={() => handleLike(tweet.id)}
-              disabled={isLiking[tweet.id]}
-            >
-              <Heart 
-                className={`h-5 w-5 group-hover:scale-110 transition-transform ${
-                  tweet.likes.some(like => like.userId === session?.user?.id) ? 'fill-pink-500' : ''
-                }`} 
-              />
-              <span>{tweet.likes.length}</span>
-            </button>
-            <button className="flex items-center space-x-2 hover:text-green-400 transition-colors group">
-              <Share2 className="h-5 w-5 group-hover:scale-110 transition-transform" />
-            </button>
-          </div>
-
-          {showComments[tweet.id] && (
-            <div className="mt-4 space-y-4">
-              <div className="border-t border-gray-700 pt-4">
-                {session && (
-                  <div className="flex space-x-2 mb-4">
-                    <input
-                      type="text"
-                      placeholder="Write a comment..."
-                      className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={commentText[tweet.id] || ''}
-                      onChange={e => setCommentText(prev => ({ ...prev, [tweet.id]: e.target.value }))}
-                    />
-                    <button
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      onClick={() => handleComment(tweet.id)}
-                    >
-                      Reply
-                    </button>
-                  </div>
-                )}
-                {tweet.comments.map(comment => (
-                  <div key={comment.id} className="flex space-x-2 p-2 rounded-lg bg-gray-700">
-                    <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden">
-                      {comment.author.image ? (
-                        <img
-                          src={comment.author.image}
-                          alt={comment.author.name || 'User'}
-                          className="h-8 w-8 object-cover"
-                        />
-                      ) : (
-                        <span className="text-sm text-gray-400">
-                          {comment.author.name?.[0] || '?'}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{comment.author.name}</p>
-                      <p className="text-gray-300">{comment.content}</p>
-                      <p className="text-xs text-gray-400">
-                        {formatDistanceToNow(new Date(comment.createdAt), {
-                          addSuffix: true,
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       ))}
-      {tweets.length === 0 && (
-        <div className="text-center py-12 bg-gray-800 rounded-xl shadow-lg">
-          <p className="text-gray-400 text-lg">
-            No tweets yet. Be the first to tweet!
-          </p>
-        </div>
-      )}
     </div>
   );
-} 
+}
+
+// Export for use in other components
+export { TweetList }; 

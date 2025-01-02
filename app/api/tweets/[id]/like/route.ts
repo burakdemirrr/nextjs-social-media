@@ -10,45 +10,65 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json(
+        { message: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
+    const tweetId = params.id;
+    const userId = session.user.id;
+
+    // Check if tweet exists
     const tweet = await prisma.tweet.findUnique({
-      where: { id: params.id },
-      include: { likes: true },
+      where: { id: tweetId },
     });
 
     if (!tweet) {
-      return new NextResponse('Tweet not found', { status: 404 });
+      return NextResponse.json(
+        { message: 'Tweet not found' },
+        { status: 404 }
+      );
     }
 
+    // Check if user has already liked the tweet
     const existingLike = await prisma.like.findUnique({
       where: {
         tweetId_userId: {
-          tweetId: params.id,
-          userId: session.user.id,
+          tweetId,
+          userId,
         },
       },
     });
 
     if (existingLike) {
-      // Unlike
+      // Unlike the tweet
       await prisma.like.delete({
-        where: { id: existingLike.id },
-      });
-    } else {
-      // Like
-      await prisma.like.create({
-        data: {
-          tweet: { connect: { id: params.id } },
-          user: { connect: { id: session.user.id } },
+        where: {
+          tweetId_userId: {
+            tweetId,
+            userId,
+          },
         },
       });
+
+      return NextResponse.json({ message: 'Tweet unliked' });
     }
 
-    return new NextResponse('Success', { status: 200 });
+    // Like the tweet
+    await prisma.like.create({
+      data: {
+        tweetId,
+        userId,
+      },
+    });
+
+    return NextResponse.json({ message: 'Tweet liked' });
   } catch (error) {
-    console.error('Error in like route:', error);
-    return new NextResponse('Internal error', { status: 500 });
+    console.error('Error in POST /api/tweets/[id]/like:', error);
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    );
   }
 } 

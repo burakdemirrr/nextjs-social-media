@@ -11,6 +11,7 @@ export async function GET() {
           select: {
             name: true,
             image: true,
+            id: true,
           },
         },
         likes: true,
@@ -32,29 +33,40 @@ export async function GET() {
 
     return NextResponse.json(tweets);
   } catch (error) {
-    console.error('Error in GET /api/tweets:', error);
-    return new NextResponse('Internal error', { status: 500 });
+    console.error("Error fetching tweets:", error);
+    return NextResponse.json(
+      { message: "Error fetching tweets" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
+
     if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json(
+        { message: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    const { content, image } = await request.json();
+    const json = await request.json();
+    const { content, image } = json;
 
-    if (!content?.trim()) {
-      return new NextResponse('Tweet content is required', { status: 400 });
+    if (!content) {
+      return NextResponse.json(
+        { message: "Content is required" },
+        { status: 400 }
+      );
     }
 
     const tweet = await prisma.tweet.create({
       data: {
         content,
         image,
-        author: { connect: { id: session.user.id } },
+        authorId: session.user.id as string,
       },
       include: {
         author: {
@@ -63,14 +75,15 @@ export async function POST(request: Request) {
             image: true,
           },
         },
-        likes: true,
-        comments: true,
       },
     });
 
-    return NextResponse.json(tweet);
+    return NextResponse.json(tweet, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/tweets:', error);
-    return new NextResponse('Internal error', { status: 500 });
+    console.error("Error creating tweet:", error);
+    return NextResponse.json(
+      { message: "Error creating tweet" },
+      { status: 500 }
+    );
   }
 } 
