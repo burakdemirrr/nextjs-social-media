@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -16,12 +16,15 @@ export async function POST(
       );
     }
 
-    const tweetId = params.id;
-    const userId = session.user.id;
-
-    // Check if tweet exists
     const tweet = await prisma.tweet.findUnique({
-      where: { id: tweetId },
+      where: { id: params.id },
+      include: {
+        likes: {
+          where: {
+            userId: session.user.id,
+          },
+        },
+      },
     });
 
     if (!tweet) {
@@ -31,41 +34,28 @@ export async function POST(
       );
     }
 
-    // Check if user has already liked the tweet
-    const existingLike = await prisma.like.findUnique({
-      where: {
-        tweetId_userId: {
-          tweetId,
-          userId,
-        },
-      },
-    });
+    const isLiked = tweet.likes.length > 0;
 
-    if (existingLike) {
-      // Unlike the tweet
-      await prisma.like.delete({
+    if (isLiked) {
+      await prisma.like.deleteMany({
         where: {
-          tweetId_userId: {
-            tweetId,
-            userId,
-          },
+          userId: session.user.id,
+          tweetId: params.id,
         },
       });
-
-      return NextResponse.json({ message: 'Tweet unliked' });
+      return NextResponse.json({ liked: false });
     }
 
-    // Like the tweet
     await prisma.like.create({
       data: {
-        tweetId,
-        userId,
+        userId: session.user.id,
+        tweetId: params.id,
       },
     });
 
-    return NextResponse.json({ message: 'Tweet liked' });
+    return NextResponse.json({ liked: true });
   } catch (error) {
-    console.error('Error in POST /api/tweets/[id]/like:', error);
+    console.error('Like error:', error);
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }

@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -17,19 +17,15 @@ export async function POST(
     }
 
     const { content } = await request.json();
-    if (!content?.trim()) {
+    if (!content) {
       return NextResponse.json(
-        { message: 'Comment cannot be empty' },
+        { message: 'Content is required' },
         { status: 400 }
       );
     }
 
-    const tweetId = params.id;
-    const userId = session.user.id;
-
-    // Check if tweet exists
     const tweet = await prisma.tweet.findUnique({
-      where: { id: tweetId },
+      where: { id: params.id },
     });
 
     if (!tweet) {
@@ -39,16 +35,16 @@ export async function POST(
       );
     }
 
-    // Create comment
     const comment = await prisma.comment.create({
       data: {
         content,
-        tweetId,
-        userId,
+        userId: session.user.id,
+        tweetId: params.id,
       },
       include: {
         author: {
           select: {
+            id: true,
             name: true,
             image: true,
           },
@@ -58,7 +54,7 @@ export async function POST(
 
     return NextResponse.json(comment);
   } catch (error) {
-    console.error('Error in POST /api/tweets/[id]/comment:', error);
+    console.error('Comment error:', error);
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }
