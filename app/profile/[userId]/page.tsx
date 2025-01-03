@@ -11,6 +11,7 @@ import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import CreateTweet from '@/components/CreateTweet';
 import CommentModal from '@/components/CommentModal';
+import LikesModal from '@/components/LikesModal';
 
 export default function ProfilePage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params);
@@ -19,6 +20,7 @@ export default function ProfilePage({ params }: { params: Promise<{ userId: stri
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTweet, setSelectedTweet] = useState<Tweet | null>(null);
+  const [selectedTweetForLikes, setSelectedTweetForLikes] = useState<Tweet | null>(null);
 
   const fetchTweets = async () => {
     try {
@@ -238,7 +240,20 @@ export default function ProfilePage({ params }: { params: Promise<{ userId: stri
                     )}
                     <div className="flex items-center space-x-8 mt-4 text-gray-400">
                       <button
-                        onClick={() => handleLike(tweet.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (!session?.user) {
+                            toast.error('Please sign in to like tweets');
+                            return;
+                          }
+                          if (tweet.likes?.length > 0 && e.detail === 2) {
+                            // Double click to show likes
+                            setSelectedTweetForLikes(tweet);
+                          } else {
+                            // Single click to like/unlike
+                            handleLike(tweet.id);
+                          }
+                        }}
                         className="flex items-center space-x-2 group"
                       >
                         <div className={`p-2 rounded-full ${
@@ -260,7 +275,15 @@ export default function ProfilePage({ params }: { params: Promise<{ userId: stri
                             />
                           </svg>
                         </div>
-                        <span className={isLiked(tweet) ? "text-pink-600" : ""}>
+                        <span 
+                          className={`${isLiked(tweet) ? "text-pink-600" : ""} cursor-pointer hover:underline`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (tweet.likes?.length > 0) {
+                              setSelectedTweetForLikes(tweet);
+                            }
+                          }}
+                        >
                           {tweet.likes?.length || 0}
                         </span>
                       </button>
@@ -313,6 +336,20 @@ export default function ProfilePage({ params }: { params: Promise<{ userId: stri
           {/* Right sidebar space if needed */}
         </div>
       </div>
+
+      {selectedTweetForLikes && (
+        <LikesModal
+          isOpen={!!selectedTweetForLikes}
+          onClose={() => setSelectedTweetForLikes(null)}
+          likes={selectedTweetForLikes.likes.map(like => ({
+            user: {
+              id: like.userId,
+              name: like.user?.name || '',
+              image: like.user?.image,
+            }
+          }))}
+        />
+      )}
 
       {selectedTweet && (
         <CommentModal

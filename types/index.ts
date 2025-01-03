@@ -18,6 +18,11 @@ export interface Tweet {
   likes: {
     id: string;
     userId: string;
+    user: {
+      id: string;
+      name: string;
+      image?: string | null;
+    };
   }[];
   comments: {
     id: string;
@@ -35,6 +40,7 @@ export interface Like {
   userId: string;
   tweetId: string;
   createdAt: string;
+  user: User;
 }
 
 export interface Comment {
